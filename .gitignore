@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# environment
+.env
+.env.*
+!.env.example
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# misc
+*.log
+*.tmp
+
+# test
+/test/
+jest-results.json

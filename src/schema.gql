@@ -1,0 +1,38 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type ActivityMatrix {
+  city: String!
+  forecast: [DailyActivityRatings!]!
+  latitude: Float!
+  longitude: Float!
+}
+
+type ActivityScore {
+  activity: String!
+  reasoning: [String!]!
+  score: Float!
+  scoreText: String!
+}
+
+type DailyActivityRatings {
+  activityRatings: [ActivityScore!]!
+  condition: String!
+  date: String!
+  precipitationProbabilityMax: Float!
+  precipitationSum: Float!
+  rainSum: Float!
+  snowfallSum: Float!
+  sunshineDuration: Float!
+  temperature2mMax: Float!
+  temperature2mMean: Float!
+  temperature2mMin: Float!
+  uvIndexMax: Float!
+  windGusts10mMax: Float!
+  windSpeed10mMax: Float!
+}
+
+type Query {
+  getWeather(city: String!): ActivityMatrix
+}
