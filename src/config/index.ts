@@ -7,4 +7,6 @@ export {
   isRedisConnected,
   closeRedisClient,
   getRedisInfo,
+  withRedisPrefix,
+  REDIS_KEY_PREFIX,
 } from './cache/redis';

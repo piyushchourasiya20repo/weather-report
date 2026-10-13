@@ -61,6 +61,8 @@ const createTestContext = () => {
       save: asyncMock<typeof city>().mockResolvedValue(city),
     },
     redisCacheService: {
+      get: asyncMock<unknown>().mockResolvedValue(null),
+      set: asyncMock<void>().mockResolvedValue(undefined),
       delete: asyncMock<void>().mockResolvedValue(undefined),
       incrementKey: asyncMock<number>().mockResolvedValue(1),
     },

@@ -33,9 +33,14 @@ describe('ForecastRepository', () => {
       ),
     };
     const manager = { getRepository: jest.fn(() => repository) };
-    const forecastRepository = new ForecastRepository({
-      createEntityManager: jest.fn(() => ({})),
-    } as any);
+    const forecastRepository = new ForecastRepository(
+      { createEntityManager: jest.fn(() => ({})) } as any,
+      {
+        get: asyncMock<unknown>().mockResolvedValue(null),
+        set: asyncMock<void>().mockResolvedValue(undefined),
+        deleteMany: asyncMock<void>().mockResolvedValue(undefined),
+      } as any,
+    );
     jest
       .spyOn(forecastRepository, 'createQueryBuilder')
       .mockReturnValue(queryBuilder as any);

@@ -11,7 +11,7 @@ export class AppController {
 
   @Get()
   getHello(): string {
-    return this.appService.getHello();
+    return this.appService.healthCheck();
   }
 
   // Run the scheduled update on demand instead of waiting for the next cron tick.

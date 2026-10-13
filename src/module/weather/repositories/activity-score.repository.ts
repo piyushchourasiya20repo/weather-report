@@ -57,22 +57,16 @@ export class ActivityScoreRepository extends Repository<ActivityScore> {
   }
 
   async getScoresByForecast(forecastId: string): Promise<ActivityScore[]> {
-    const cacheKey = `activity-scores:${forecastId}`;
-
-    const scores = await this.find({
+    return this.find({
       where: { forecastId },
       order: { activity: 'ASC' },
     });
-
-    return scores;
   }
 
   async getScoreByForecastAndActivity(
     forecastId: string,
     activity: string,
   ): Promise<ActivityScore | null> {
-    const cacheKey = `activity-score:${forecastId}:${activity}`;
-
     const score = await this.findOne({
       where: { forecastId, activity },
     });

@@ -42,7 +42,9 @@ export class ForecastPersistenceService {
       return [];
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    let anyUpdated = false;
+
+    const savedForecasts = await this.dataSource.transaction(async (manager) => {
       const savedForecasts: Forecast[] = [];
 
       for (const dailyData of forecastData) {
@@ -73,6 +75,7 @@ export class ForecastPersistenceService {
           );
 
         if (updated) {
+          anyUpdated = true;
           const activityScoreEntities = dailyData.activityRatings.map((rating) =>
             this.activityScoreRepository.create({
               forecastId: upsertedForecast.id,
@@ -99,6 +102,13 @@ export class ForecastPersistenceService {
 
       return savedForecasts;
     });
+
+    // Invalidate after commit so readers cannot re-cache pre-commit data.
+    if (anyUpdated) {
+      await this.forecastRepository.invalidateCity(cityId);
+    }
+
+    return savedForecasts;
   }
 
   async getStoredForecast(cityId: string, days: number = 7): Promise<Forecast[]> {

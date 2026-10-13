@@ -2,9 +2,10 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import axios from 'axios';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { QueryFailedError } from 'typeorm';
-import { OPEN_METEO_CONSTANTS } from '../constants';
+import { CACHE_CONSTANTS, CACHE_KEYS, OPEN_METEO_CONSTANTS } from '../constants';
 import { env } from '../config/env';
 import { CityRepository } from '../module/weather/repositories/city.repository';
+import { RedisCacheService } from './redis-cache.service';
 
 interface GeocodingResult {
   name: string;
@@ -45,16 +46,35 @@ export class OpenMeteoService {
     @InjectPinoLogger(OpenMeteoService.name)
     private readonly logger: PinoLogger,
     private readonly cityRepository: CityRepository,
+    private readonly redisCacheService: RedisCacheService,
   ) {}
 
   async getCoordinates(cityName: string): Promise<GeocodingResult | null> {
-    const cachedCity = await this.cityRepository.findByName(cityName);
-    if (cachedCity) {
+    const cacheKey = CACHE_KEYS.geo(cityName);
+    const cached = await this.redisCacheService.get<GeocodingResult>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const result = await this.lookupCoordinates(cityName);
+    if (result) {
+      await this.redisCacheService.set(
+        cacheKey,
+        result,
+        CACHE_CONSTANTS.CITY_TTL_SECONDS,
+      );
+    }
+    return result;
+  }
+
+  private async lookupCoordinates(cityName: string): Promise<GeocodingResult | null> {
+    const cityFromDb = await this.cityRepository.findByName(cityName);
+    if (cityFromDb) {
       this.logger.debug({ cityName }, 'Using stored city coordinates');
       return {
-        name: cachedCity.name,
-        latitude: Number(cachedCity.latitude),
-        longitude: Number(cachedCity.longitude),
+        name: cityFromDb.name,
+        latitude: Number(cityFromDb.latitude),
+        longitude: Number(cityFromDb.longitude),
       };
     }
 

@@ -1,13 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Forecast } from '../entities/forecast.entity';
+import { RedisCacheService } from '../../../integration/redis-cache.service';
+import { CACHE_KEYS } from '../../../constants';
 
 @Injectable()
 export class ForecastRepository extends Repository<Forecast> {
   constructor(
     private dataSource: DataSource,
+    private readonly redisCacheService: RedisCacheService,
   ) {
     super(Forecast, dataSource.createEntityManager());
+  }
+
+  async invalidateCity(cityId: string): Promise<void> {
+    await this.redisCacheService.deleteMany([
+      CACHE_KEYS.forecastRecent(cityId),
+      CACHE_KEYS.latestFetch(cityId),
+    ]);
   }
 
   async upsertForecast(
@@ -90,7 +100,11 @@ export class ForecastRepository extends Repository<Forecast> {
     cityId: string,
     limit: number = 7,
   ): Promise<Forecast[]> {
-    const cacheKey = `forecast:${cityId}:recent:${limit}`;
+    const cacheKey = CACHE_KEYS.forecastRecent(cityId);
+    const cached = await this.redisCacheService.get<Forecast[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     const forecasts = await this.createQueryBuilder('forecast')
       .leftJoinAndSelect('forecast.activityScores', 'activityScores')
@@ -99,6 +113,10 @@ export class ForecastRepository extends Repository<Forecast> {
       .take(limit)
       .getMany();
 
+    if (forecasts.length > 0) {
+      await this.redisCacheService.set(cacheKey, forecasts);
+    }
+
     return forecasts;
   }
 
@@ -106,15 +124,11 @@ export class ForecastRepository extends Repository<Forecast> {
     cityId: string,
     forecastDate: Date,
   ): Promise<Forecast | null> {
-    const dateString = forecastDate.toISOString().split('T')[0]; // YYYY-MM-DD
-    const cacheKey = `forecast:${cityId}:${dateString}`;
-
     const forecast = await this.createQueryBuilder('forecast')
       .leftJoinAndSelect('forecast.activityScores', 'activityScores')
       .where('forecast.cityId = :cityId', { cityId })
       .andWhere('forecast.forecastDate = :forecastDate', { forecastDate })
       .getOne();
-
 
     return forecast || null;
   }
@@ -137,11 +151,19 @@ export class ForecastRepository extends Repository<Forecast> {
 
   async deleteAllByCityId(cityId: string): Promise<number> {
     const result = await this.delete({ cityId });
+    if (result.affected) {
+      await this.invalidateCity(cityId);
+    }
 
     return result.affected || 0;
   }
 
   async getLatestFetchTimeForCity(cityId: string): Promise<Date | null> {
+    const cacheKey = CACHE_KEYS.latestFetch(cityId);
+    const cached = await this.redisCacheService.get<string>(cacheKey);
+    if (cached) {
+      return new Date(cached);
+    }
 
     const result = await this.createQueryBuilder('forecast')
       .select('forecast.fetchedAt')
@@ -151,6 +173,9 @@ export class ForecastRepository extends Repository<Forecast> {
       .getRawOne();
 
     const fetchTime = result?.forecast_fetched_at || null;
+    if (fetchTime) {
+      await this.redisCacheService.set(cacheKey, new Date(fetchTime).toISOString());
+    }
 
     return fetchTime;
   }

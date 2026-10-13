@@ -6,6 +6,7 @@ import { ActivityScorerService } from './services/activity-scorer.service';
 import { ForecastPersistenceService } from './services/forecast-persistence.service';
 import { RedisCacheService } from '../../integration/redis-cache.service';
 import { CityRepository } from './repositories/city.repository';
+import { CACHE_KEYS } from '../../constants';
 
 @Injectable()
 export class WeatherService {
@@ -68,7 +69,11 @@ export class WeatherService {
       );
 
       this.logger.info(
-        { caller, cityName: geoData.name, forecastDays: forecastDataToStore.length },
+        {
+          caller,
+          cityName: geoData.name,
+          forecastDays: forecastDataToStore.length,
+        },
         'Stored forecast data',
       );
 
@@ -100,23 +105,23 @@ export class WeatherService {
         geoData.longitude,
       );
     }
+    
 
     const isFresh = await this.forecastPersistenceService.isForecastFresh(
       city.id,
-      6,
+      caller === 'API' ? 6 : 3, // hours of freshness required depending on the caller 
     );
-
-    if (isFresh && caller === 'SCHEDULER') {
-      this.logger.debug(
-        { caller, cityName: geoData.name },
-        'Skipping refresh because forecast is current',
-      );
-      return null;
-    }
 
     let activityMatrix;
 
     if (isFresh) {
+      if (caller === 'SCHEDULER') {
+        this.logger.debug(
+          { caller, cityName: geoData.name },
+          'Skipping refresh because forecast is fresh',
+        );
+        return null;
+      }
       this.logger.debug(
         { caller, cityName: geoData.name },
         'Using stored forecast',
@@ -145,13 +150,25 @@ export class WeatherService {
       geoData,
     );
     await this.redisCacheService.delete(`city:searches:${geoData.name}`);
+    await this.redisCacheService.delete(CACHE_KEYS.weather(geoData.name));
     return activityMatrix;
   }
 
   async getWeatherByCity(cityName: string): Promise<ActivityMatrix | null> {
-    const weather = await this.weatherByCityHelper(cityName, 'API');
+    const searchKey = `city:searches:${cityName}`;
+    const cacheKey = CACHE_KEYS.weather(cityName);
+    const cached = await this.redisCacheService.get<ActivityMatrix>(cacheKey);
+    if (cached) {
+      // Cache hits still count toward scheduler popularity.
+      await this.redisCacheService.incrementKey(searchKey);
+      return cached;
+    }
 
-    await this.redisCacheService.incrementKey(`city:searches:${cityName}`);
+    const weather = await this.weatherByCityHelper(cityName, 'API');
+    await this.redisCacheService.incrementKey(searchKey);
+    if (weather) {
+      await this.redisCacheService.set(cacheKey, weather);
+    }
 
     return weather;
   }

@@ -1,7 +1,13 @@
 import { createClient, type RedisClientType } from 'redis';
 import { redisConfig } from './redis.config';
 import { bootstrapLogger } from '../logger';
-import { REDIS_DEFAULTS } from '../../constants';
+import { APP_CONSTANTS, REDIS_DEFAULTS } from '../../constants';
+
+export const REDIS_KEY_PREFIX = `${APP_CONSTANTS.NAME}:`;
+
+export function withRedisPrefix(key: string): string {
+  return `${REDIS_KEY_PREFIX}${key}`;
+}
 
 let redisClient: RedisClientType | null = null;
 let isConnecting = false;

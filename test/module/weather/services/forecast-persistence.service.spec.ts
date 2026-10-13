@@ -32,6 +32,7 @@ describe('ForecastPersistenceService', () => {
     };
     const forecastRepository = {
       create: jest.fn((value) => value),
+      invalidateCity: asyncMock<void>().mockResolvedValue(undefined),
       upsertForecastIfNewer: asyncMock<{
         forecast: typeof storedForecast;
         updated: boolean;
@@ -54,8 +55,18 @@ describe('ForecastPersistenceService', () => {
       activityScoreRepository as any,
     );
 
-    return { service, activityScoreRepository, storedForecast };
+    return { service, activityScoreRepository, forecastRepository, storedForecast };
   };
+
+  it('invalidates the city cache only when a forecast was updated', async () => {
+    const updatedContext = createService(true);
+    await updatedContext.service.storeForecastData('city-id', createForecastData());
+    expect(updatedContext.forecastRepository.invalidateCity).toHaveBeenCalledWith('city-id');
+
+    const staleContext = createService(false);
+    await staleContext.service.storeForecastData('city-id', createForecastData());
+    expect(staleContext.forecastRepository.invalidateCity).not.toHaveBeenCalled();
+  });
 
   it('does not overwrite activity scores when a stale forecast loses', async () => {
     const { service, activityScoreRepository, storedForecast } =

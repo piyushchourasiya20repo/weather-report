@@ -24,6 +24,15 @@ export const TIME_CONSTANTS = {
 export const CACHE_CONSTANTS = {
   DEFAULT_TTL_SECONDS: TIME_CONSTANTS.SECONDS_PER_HOUR,
   COUNTER_TTL_SECONDS: TIME_CONSTANTS.SECONDS_PER_HOUR * 6,
+  CITY_TTL_SECONDS: TIME_CONSTANTS.SECONDS_PER_HOUR * 24 * 30,
+} as const;
+
+export const CACHE_KEYS = {
+  city: (name: string) => `city:${name.toLowerCase()}`,
+  geo: (query: string) => `geo:${query.toLowerCase()}`,
+  forecastRecent: (cityId: string) => `forecast:${cityId}`,
+  latestFetch: (cityId: string) => `latest-fetch:${cityId}`,
+  weather: (city: string) => `weather:${city.toLowerCase()}`,
 } as const;
 
 export const OPEN_METEO_CONSTANTS = {
